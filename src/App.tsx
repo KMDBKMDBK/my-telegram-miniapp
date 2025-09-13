@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import WebApp from '@twa-dev/sdk';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
+import { getAuth, signInAnonymously } from 'firebase/auth';
 import './App.css';
 
 // Конфигурация Firebase
@@ -17,6 +18,7 @@ const firebaseConfig = {
 // Инициализация Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 const App: React.FC = () => {
   const [messageText, setMessageText] = useState<string>('Загрузка...');
@@ -24,43 +26,69 @@ const App: React.FC = () => {
 
   useEffect(() => {
     WebApp.ready();
-    WebApp.expand(); // Разворачиваем мини-аппку на весь экран
+    WebApp.expand();
+
     const urlParams = new URLSearchParams(window.location.search);
     const messageId = urlParams.get('message_id');
+    const urlTelegramUserId = urlParams.get('user_id');
 
-    if (!messageId) {
-      setError('ID сообщения не указан.');
+    if (!messageId || !urlTelegramUserId) {
+      setError('ID сообщения или пользователя не указан.');
       return;
     }
 
     const fetchMessage = async () => {
       try {
+        // Анонимная аутентификация
+        const userCredential = await signInAnonymously(auth);
+        const firebaseUid = userCredential.user.uid;
+
+        // Получаем Telegram ID из WebApp
+        const user = WebApp.initDataUnsafe.user;
+        const telegramUserId = user ? String(user.id) : null;
+
+        if (!telegramUserId || telegramUserId !== urlTelegramUserId) {
+          setError('Доступ к сообщению запрещён.');
+          return;
+        }
+
+        // Создаём/обновляем документ в коллекции users для связи Telegram ID и Firebase UID
+        const userDocRef = doc(db, 'users', firebaseUid);
+        await setDoc(userDocRef, {
+          telegram_id: telegramUserId,
+          firebase_uid: firebaseUid
+        }, { merge: true });
+
+        // Читаем сообщение
         const docRef = doc(db, 'messages', messageId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setMessageText(docSnap.data().text);
+          const data = docSnap.data();
+          if (data.user_id !== telegramUserId) {
+            setError('Доступ к сообщению запрещён.');
+            return;
+          }
+          setMessageText(data.text);
         } else {
           setError('Сообщение не найдено.');
         }
       } catch (e) {
         setError('Ошибка загрузки сообщения.');
-        console.error(e);
+        console.error('Ошибка:', e);
       }
     };
 
     fetchMessage();
   }, []);
 
-  // Разбиваем текст на абзацы по \n или длине (макс. 4096 символов)
+  // Разбиваем текст на абзацы
   const renderMessage = (text: string) => {
-    // Разбиваем по \n, если есть
     const paragraphs = text.split('\n').filter(p => p.trim() !== '');
     if (paragraphs.length > 1) {
       return paragraphs.map((para, index) => (
         <div key={index} className="message-block" dangerouslySetInnerHTML={{ __html: para }} />
       ));
     }
-    // Если нет \n, разбиваем по длине (имитация Telegram)
     const maxLength = 4096;
     const blocks = [];
     for (let i = 0; i < text.length; i += maxLength) {
