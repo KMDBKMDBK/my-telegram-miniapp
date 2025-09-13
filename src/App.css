@@ -1,17 +1,36 @@
 .container {
-       padding: 20px;
-       font-family: Arial, sans-serif;
-       max-width: 600px;
-       margin: 0 auto;
-       background-color: #f5f5f5;
-     }
-     h1 {
-       font-size: 24px;
-       text-align: center;
-       color: #333;
-     }
-     p, div {
-       font-size: 16px;
-       line-height: 1.5;
-       color: #333;
-     }
+  padding: 20px;
+  font-family: Arial, sans-serif;
+  max-width: 600px;
+  margin: 0 auto;
+  background-color: #f5f5f5;
+}
+h1 {
+  font-size: 24px;
+  text-align: center;
+  color: #333;
+}
+.message-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.message-block {
+  background-color: #fff;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  font-size: 16px;
+  line-height: 1.5;
+  color: #333;
+}
+.message-block b {
+  font-weight: bold;
+}
+.message-block i {
+  font-style: italic;
+}
+.message-block a {
+  color: #007bff;
+  text-decoration: underline;
+}
